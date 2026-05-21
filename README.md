@@ -1,1 +1,252 @@
-# Evidence---Demonstration-of-a-Programming-Paradigm
+# E4 — Logic Programming Paradigm
+
+### Facundo Gael Piñeiro González
+### Sudoku Solver in Prolog
+
+---
+
+## Introduction
+
+Sudoku is a logic-based puzzle played on a 9×9 grid. The goal is to fill every cell with a number from 1 to 9 so that each number appears only once in every row, every column, and each of the nine 3×3 subgrids. Although the rules are straightforward, solving Sudoku efficiently can be computationally difficult. In fact, the generalized n×n version of Sudoku is considered NP-complete, meaning there is no known algorithm capable of solving every possible instance in polynomial time (Russell & Norvig, 2021, Chapter 6, p. 202).
+
+Sudoku is also an example of a **Constraint Satisfaction Problem (CSP)**. A CSP consists of a set of variables, a domain of possible values, and a group of constraints that determine which assignments are valid. The objective is to find a solution that satisfies all constraints at the same time (Russell & Norvig, 2021, Chapter 6, p. 202). Problems of this type are common in areas such as scheduling, resource allocation, and compiler optimization.
+
+The **Logic Programming paradigm** is especially well suited for CSPs because it focuses on describing the conditions a solution must satisfy instead of explicitly defining the steps to reach it. In Prolog, the inference engine automatically searches for solutions using resolution and backtracking. When one possible solution fails, Prolog returns to a previous decision point and tries another alternative, allowing it to systematically explore the search space without requiring the programmer to manually control the process (Sterling & Shapiro, 1994, Chapter 2).
+
+For Sudoku, the main constraints are the uniqueness across rows, columns, and 3×3 subgrids which can be represented directly as Prolog rules. The solver is then produced naturally from these constraints. To improve efficiency, this project uses SWI-Prolog's **CLP(FD)** library (Constraint Logic Programming over Finite Domains), which applies constraint propagation techniques to reduce the search space before backtracking occurs (Triska, 2016).
+
+---
+
+## Models
+
+The solution models Sudoku directly as a Constraint Satisfaction Problem. The 9×9 grid is represented as a list of 9 rows, where each cell is a variable that can take a value from 1 to 9. Three sets of constraints are then declared over these variables:
+
+- **Row constraint:** all digits in a row must be distinct.
+- **Column constraint:** all digits in a column must be distinct.
+- **Box constraint:** all digits in each 3×3 subgrid must be distinct.
+
+The following diagram illustrates how the board is structured as a CSP, mapping each cell to a variable and defining its domain and constraints:
+
+> 📷 *[Insert board structure diagram here]*
+
+---
+
+What makes this solution a Logic Programming solution — and not simply a search algorithm — is that the program never explicitly describes *how* to find a valid assignment. Instead, the three constraints above are declared as Prolog rules, and SWI-Prolog's inference engine handles the search automatically. The solver exists because the constraints exist; there is no separate solving logic.
+
+The search mechanism Prolog uses internally is **backtracking**. Starting from the first empty cell, Prolog attempts to assign a value from the domain. If all constraints are satisfied, it moves to the next cell. If any constraint is violated, it backtracks to the previous decision point and tries the next available value. This continues until a complete valid assignment is found or the entire search space is exhausted.
+
+The following diagram shows this backtracking process over a partial board:
+
+> 📷 *[Insert backtracking flow diagram here]*
+
+With CLP(FD), constraint propagation runs before backtracking begins. When a value is assigned to a cell, the library automatically eliminates that value from the domains of all related cells in the same row, column, and box. This reduces the number of states explored significantly compared to naive backtracking.
+
+---
+
+## Implementation
+
+The solver is implemented in SWI-Prolog using the `clpfd` library (Constraint Logic Programming over Finite Domains). The full solution is split into two files:
+
+- `sudoku.pl` — contains the solver and the pretty print predicates.
+- `test_sudoku.pl` — contains the test cases.
+
+**How to run:**
+
+```bash
+# Open the solver
+swipl sudoku.pl
+```
+
+Then enter a query manually in the Prolog console. Empty cells are represented as `_` (unbound Prolog variables), and fixed cells as their digit:
+
+```prolog
+?- Rows = [
+     [5,3,_,_,7,_,_,_,_],
+     [6,_,_,1,9,5,_,_,_],
+     [_,9,8,_,_,_,_,6,_],
+     [8,_,_,_,6,_,_,_,3],
+     [4,_,_,8,_,3,_,_,1],
+     [7,_,_,_,2,_,_,_,6],
+     [_,6,_,_,_,_,2,8,_],
+     [_,_,_,4,1,9,_,_,5],
+     [_,_,_,_,8,_,_,7,9]
+   ], sudoku(Rows), pretty_print(Rows).
+```
+
+**Code explanation:**
+
+`sudoku/1` is the entry predicate. It receives the board, enforces that it is a 9×9 structure, constrains all cells to the domain 1..9, and applies the three constraint sets before labeling:
+
+```prolog
+sudoku(Rows) :-
+    length(Rows, 9),
+    maplist(length_(9), Rows),
+    append(Rows, Cells),
+    Cells ins 1..9,
+    maplist(all_distinct, Rows),
+    transpose(Rows, Cols),
+    maplist(all_distinct, Cols),
+    boxes(Rows),
+    maplist(label, Rows).
+```
+
+`boxes/1` and `box/3` handle the 3×3 subgrid constraint. `boxes/1` groups the 9 rows into three bands of three, and `box/3` recursively extracts each 3×3 block and applies `all_distinct`:
+
+```prolog
+boxes([A,B,C,D,E,F,G,H,I]) :-
+    box(A, B, C),
+    box(D, E, F),
+    box(G, H, I).
+
+box([], [], []).
+box([A,B,C|R1], [D,E,F|R2], [G,H,I|R3]) :-
+    all_distinct([A,B,C,D,E,F,G,H,I]),
+    box(R1, R2, R3).
+```
+
+`maplist(label, Rows)` is what triggers the actual search — it tells CLP(FD) to assign concrete values to all remaining variables, using constraint propagation and backtracking internally.
+
+`pretty_print/1`, `print_rows/2`, and `print_cells/2` handle the display. They use counters to place horizontal and vertical separators after every 3rd row and column respectively, producing a readable grid.
+
+---
+
+## Tests
+
+To run all tests at once:
+
+```bash
+swipl -g "halt" test_sudoku.pl
+```
+
+**Test 1 — Easy puzzle**
+
+Many cells are given, minimal backtracking required.
+
+```prolog
+?- Rows = [
+     [5,3,_,_,7,_,_,_,_],
+     [6,_,_,1,9,5,_,_,_],
+     [_,9,8,_,_,_,_,6,_],
+     [8,_,_,_,6,_,_,_,3],
+     [4,_,_,8,_,3,_,_,1],
+     [7,_,_,_,2,_,_,_,6],
+     [_,6,_,_,_,_,2,8,_],
+     [_,_,_,4,1,9,_,_,5],
+     [_,_,_,_,8,_,_,7,9]
+   ], sudoku(Rows), pretty_print(Rows).
+```
+
+```
++-------+-------+-------+
+| 5 3 4 | 6 7 8 | 9 1 2 
+| 6 7 2 | 1 9 5 | 3 4 8 
+| 1 9 8 | 3 4 2 | 5 6 7 
++-------+-------+-------+
+| 8 5 9 | 7 6 1 | 4 2 3 
+| 4 2 6 | 8 5 3 | 7 9 1 
+| 7 1 3 | 9 2 4 | 8 5 6 
++-------+-------+-------+
+| 9 6 1 | 5 3 7 | 2 8 4 
+| 2 8 7 | 4 1 9 | 6 3 5 
+| 3 4 5 | 2 8 6 | 1 7 9 
++-------+-------+-------+
+```
+
+**Test 2 — Hard puzzle**
+
+Fewer given cells, requires deeper backtracking. Sourced from Project Euler problem 96.
+
+```prolog
+?- Rows = [
+     [_,_,3,_,2,_,6,_,_],
+     [9,_,_,3,_,5,_,_,1],
+     [_,_,1,8,_,6,4,_,_],
+     [_,_,8,1,_,2,9,_,_],
+     [7,_,_,_,_,_,_,_,8],
+     [_,_,6,7,_,8,2,_,_],
+     [_,_,2,6,_,9,5,_,_],
+     [8,_,_,2,_,3,_,_,9],
+     [_,_,5,_,1,_,3,_,_]
+   ], sudoku(Rows), pretty_print(Rows).
+```
+
+```
++-------+-------+-------+
+| 4 8 3 | 9 2 1 | 6 5 7 
+| 9 6 7 | 3 4 5 | 8 2 1 
+| 2 5 1 | 8 7 6 | 4 9 3 
++-------+-------+-------+
+| 5 4 8 | 1 3 2 | 9 7 6 
+| 7 2 9 | 5 6 4 | 1 3 8 
+| 1 3 6 | 7 9 8 | 2 4 5 
++-------+-------+-------+
+| 3 7 2 | 6 8 9 | 5 1 4 
+| 8 1 4 | 2 5 3 | 7 6 9 
+| 6 9 5 | 4 1 7 | 3 8 2 
++-------+-------+-------+
+```
+
+**Test 3 — Invalid puzzle**
+
+Row 1 contains two 5s, directly violating the row constraint. The solver returns `false` immediately after constraint propagation detects the conflict — no backtracking needed.
+
+```prolog
+?- Rows = [
+     [5,5,_,_,7,_,_,_,_],
+     [6,_,_,1,9,5,_,_,_],
+     [_,9,8,_,_,_,_,6,_],
+     [8,_,_,_,6,_,_,_,3],
+     [4,_,_,8,_,3,_,_,1],
+     [7,_,_,_,2,_,_,_,6],
+     [_,6,_,_,_,_,2,8,_],
+     [_,_,_,4,1,9,_,_,5],
+     [_,_,_,_,8,_,_,7,9]
+   ], sudoku(Rows), pretty_print(Rows).
+```
+
+```
+false.
+```
+
+---
+
+## Analysis
+
+### Time Complexity
+
+The core of the solver is constraint propagation followed by backtracking search. In the worst case, each of the 81 cells can take any value from 1 to 9, giving a naive upper bound of **O(9⁸¹)**. However, this is never reached in practice.
+
+CLP(FD) applies constraint propagation before backtracking begins. Every time a value is assigned to a cell, `all_distinct` automatically eliminates that value from the domains of all cells in the same row, column, and box. This reduces the effective branching factor significantly at each step.
+
+Let **n** be the number of empty cells in the puzzle. The actual complexity is:
+
+```
+O(9^n)  — worst case with backtracking only
+O(9^n)  — still exponential, but with a much smaller effective n in practice
+          due to constraint propagation pruning the domain at each step
+```
+
+For a standard 9×9 Sudoku with a unique solution, constraint propagation alone resolves most cells without any backtracking at all. The remaining search space is small enough that the solver runs in milliseconds.
+
+### Other Paradigms and Tradeoffs
+
+| Paradigm | Language | Approach | Time Complexity | Tradeoff |
+|---|---|---|---|---|
+| **Logic** (this solution) | Prolog | Declare constraints, engine searches | O(9^n) pruned | Minimal code, paradigm handles search automatically |
+| **Functional** | Haskell / Racket | Recursive backtracking with pure functions | O(9^n) | Search must be written explicitly, but remains declarative |
+| **Object-Oriented** | Java / Python | Backtracking solver as a class with methods | O(9^n) | More verbose, full control over heuristics and optimizations |
+| **Parallel** | C++ / CUDA | Explore multiple branches simultaneously | O(9^n / cores) | Fastest in theory, but coordination overhead and complexity are significant |
+
+The key distinction between the Logic solution and the others is not complexity class — all backtracking approaches share the same worst case — but rather **who writes the search**. In Prolog, the search is provided by the language itself. In every other paradigm, the programmer must implement it explicitly.
+
+The most practical alternative would be an **OOP solution in Python**, where a backtracking solver with a Minimum Remaining Values (MRV) heuristic — always choosing the cell with the fewest legal values first — can dramatically reduce the search tree in practice (Russell & Norvig, 2021, Chapter 6, p. 143). This heuristic is something Prolog's CLP(FD) also applies internally, which is part of what makes the two approaches comparable in real-world performance despite their structural differences.
+
+---
+
+## References
+
+Russell, S. J., & Norvig, P. (2021). *Artificial Intelligence: A Modern Approach* (4th ed.). Pearson. Chapter 6, pp. 202–210.
+
+Sterling, L., & Shapiro, E. (1994). *The Art of Prolog: Advanced Programming Techniques* (2nd ed.). MIT Press.
+
+Triska, M. (2016). The Finite Domain Constraint Solver of SWI-Prolog. Available at: https://www.swi-prolog.org/man/clpfd.html
