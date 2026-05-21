@@ -27,7 +27,7 @@ The solution models Sudoku directly as a Constraint Satisfaction Problem. The 9�
 
 The following diagram illustrates how the board is structured as a CSP, mapping each cell to a variable and defining its domain and constraints:
 
-> 📷 *[Insert board structure diagram here]*
+<img width="1075" height="931" alt="sudokuview drawio" src="https://github.com/user-attachments/assets/4f7504b1-0433-4780-a877-00fc42c119e3" />
 
 ---
 
@@ -37,7 +37,7 @@ The search mechanism Prolog uses internally is **backtracking**. Starting from t
 
 The following diagram shows this backtracking process over a partial board:
 
-> 📷 *[Insert backtracking flow diagram here]*
+<img width="611" height="1171" alt="FlowChart drawio" src="https://github.com/user-attachments/assets/5f7fd447-5461-430d-b081-0386cd106d09" />
 
 With CLP(FD), constraint propagation runs before backtracking begins. When a value is assigned to a cell, the library automatically eliminates that value from the domains of all related cells in the same row, column, and box. This reduces the number of states explored significantly compared to naive backtracking.
 
