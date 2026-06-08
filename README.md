@@ -37,7 +37,7 @@ The search mechanism Prolog uses internally is **backtracking**. Starting from t
 
 The following diagram shows this backtracking process over a partial board:
 
-<img width="611" height="1171" alt="FlowChart drawio" src="https://github.com/user-attachments/assets/5f7fd447-5461-430d-b081-0386cd106d09" />
+<img width="611" height="1171" alt="FlowChart drawio" src="https://github.com/user-attachments/assets/592e53af-1809-4cec-a1de-5c902aebbaca" />
 
 With CLP(FD), constraint propagation runs before backtracking begins. When a value is assigned to a cell, the library automatically eliminates that value from the domains of all related cells in the same row, column, and box. This reduces the number of states explored significantly compared to naive backtracking.
 
