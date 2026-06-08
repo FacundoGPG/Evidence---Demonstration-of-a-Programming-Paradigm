@@ -86,10 +86,8 @@ The following diagram shows the PDA in theory:
 
 ## Implementation
 
-The solver is implemented in SWI-Prolog using the `clpfd` library (Constraint Logic Programming over Finite Domains). The full solution is split into two files:
-
-- `sudoku.pl` — contains the solver and the pretty print predicates.
-- `test_sudoku.pl` — contains the test cases.
+The full solution is contained in a single file:
+- `sudoku.pl` — contains the solver.
 
 **How to run:**
 
@@ -157,10 +155,10 @@ box([A,B,C|R1], [D,E,F|R2], [G,H,I|R3]) :-
 
 ## Tests
 
-To run all tests at once:
+To run the solver, load the file in SWI-Prolog:
 
 ```bash
-swipl -g "halt" test_sudoku.pl
+swipl sudoku.pl
 ```
 
 **Test 1 — Easy puzzle**
