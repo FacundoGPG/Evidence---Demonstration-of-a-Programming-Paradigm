@@ -31,7 +31,7 @@ The following diagram illustrates how the board is structured as a CSP, mapping 
 
 ---
 
-What makes this solution a Logic Programming solution — and not simply a search algorithm — is that the program never explicitly describes *how* to find a valid assignment. Instead, the three constraints above are declared as Prolog rules, and SWI-Prolog's inference engine handles the search automatically. The solver exists because the constraints exist; there is no separate solving logic.
+What makes this solution a Logic Programming solution and not simply a search algorithm is that the program never explicitly describes *how* to find a valid assignment. Instead, the three constraints above are declared as Prolog rules, and SWI-Prolog's inference engine handles the search automatically. The solver exists because the constraints exist; there is no separate solving logic.
 
 The search mechanism Prolog uses internally is **backtracking**. Starting from the first empty cell, Prolog attempts to assign a value from the domain. If all constraints are satisfied, it moves to the next cell. If any constraint is violated, it backtracks to the previous decision point and tries the next available value. This continues until a complete valid assignment is found or the entire search space is exhausted.
 
@@ -75,7 +75,9 @@ Then enter a query manually in the Prolog console. Empty cells are represented a
 
 **Code explanation:**
 
-`sudoku/1` is the entry predicate. It receives the board, enforces that it is a 9×9 structure, constrains all cells to the domain 1..9, and applies the three constraint sets before labeling:
+`sudoku/1` is the entry predicate. It takes the board, checks that it is a 9×9 structure, sets the domain of every cell to 1..9, and applies the three constraint sets. One thing worth noting is that labeling is done last on purpose. CLP(FD) works in two phases: first you declare all the constraints, and then `label` actually kicks off the search. Doing it this way lets the library run as much constraint propagation as possible before any backtracking starts, which cuts down the search space a lot.
+
+`append(Rows, Cells)` flattens the 9 rows into a single list of 81 cells, so the domain constraint `Cells ins 1..9` can be applied to everything at once instead of going row by row:
 
 ```prolog
 sudoku(Rows) :-
@@ -90,7 +92,9 @@ sudoku(Rows) :-
     maplist(label, Rows).
 ```
 
-`boxes/1` and `box/3` handle the 3×3 subgrid constraint. `boxes/1` groups the 9 rows into three bands of three, and `box/3` recursively extracts each 3×3 block and applies `all_distinct`:
+`boxes/1` takes all 9 rows and splits them into three horizontal bands of 3 rows each, rows 1–3, 4–6, and 7–9, then passes each band to `box/3`.
+
+`box/3` works on three rows at a time. It uses Prolog's pattern matching `[A,B,C|Rest]` to pull exactly 3 elements from each row, giving 9 elements total that form one complete 3×3 subgrid. Those 9 elements go into `all_distinct`, and then the predicate recurses on the remaining columns until all three blocks in the band are covered:
 
 ```prolog
 boxes([A,B,C,D,E,F,G,H,I]) :-
@@ -104,9 +108,9 @@ box([A,B,C|R1], [D,E,F|R2], [G,H,I|R3]) :-
     box(R1, R2, R3).
 ```
 
-`maplist(label, Rows)` is what triggers the actual search — it tells CLP(FD) to assign concrete values to all remaining variables, using constraint propagation and backtracking internally.
+`maplist(label, Rows)` is what actually triggers the search. It tells CLP(FD) to find concrete values for all the remaining variables, using constraint propagation and backtracking under the hood.
 
-`pretty_print/1`, `print_rows/2`, and `print_cells/2` handle the display. They use counters to place horizontal and vertical separators after every 3rd row and column respectively, producing a readable grid.
+`pretty_print/1`, `print_rows/2`, and `print_cells/2` handle the output. They use counters to insert horizontal and vertical separators after every 3rd row and column, which gives you the readable grid format.
 
 ---
 
@@ -188,7 +192,7 @@ Fewer given cells, requires deeper backtracking. Sourced from Project Euler prob
 
 **Test 3 — Invalid puzzle**
 
-Row 1 contains two 5s, directly violating the row constraint. The solver returns `false` immediately after constraint propagation detects the conflict — no backtracking needed.
+Row 1 contains two 5s, directly violating the row constraint. The solver returns `false` immediately after constraint propagation detects the conflict, no backtracking needed.
 
 ```prolog
 ?- Rows = [
@@ -214,32 +218,32 @@ false.
 
 ### Time Complexity
 
-The core of the solver is constraint propagation followed by backtracking search. In the worst case, each of the 81 cells can take any value from 1 to 9, giving a naive upper bound of **O(9⁸¹)**. However, this is never reached in practice.
+The solver works by doing constraint propagation first, then backtracking search. If you think about it naively, each of the 81 cells could take any value from 1 to 9, which gives a theoretical upper bound of O(9⁸¹), but that is never actually what happens.
 
-CLP(FD) applies constraint propagation before backtracking begins. Every time a value is assigned to a cell, `all_distinct` automatically eliminates that value from the domains of all cells in the same row, column, and box. This reduces the effective branching factor significantly at each step.
+CLP(FD) brings that number way down. Every time a cell gets assigned a value, `all_distinct` automatically removes that value from the domains of every related cell in the same row, column, and box. So by the time backtracking starts, most of the impossible branches have already been cut off.
 
-Let **n** be the number of empty cells in the puzzle. The actual complexity is:
+If we let **n** be the number of empty cells, the complexity looks like this:
 
 ```
 O(9^n)  — worst case with backtracking only
-O(9^n)  — still exponential, but with a much smaller effective n in practice
-          due to constraint propagation pruning the domain at each step
+O(9^n)  — still exponential, but n is effectively much smaller in practice
+          because constraint propagation prunes the domain at each step
 ```
 
-For a standard 9×9 Sudoku with a unique solution, constraint propagation alone resolves most cells without any backtracking at all. The remaining search space is small enough that the solver runs in milliseconds.
+For a typical 9×9 puzzle with a unique solution, propagation alone resolves most cells before any search is needed. The solver finishes in milliseconds.
 
 ### Other Paradigms and Tradeoffs
 
 | Paradigm | Language | Approach | Time Complexity | Tradeoff |
 |---|---|---|---|---|
 | **Logic** (this solution) | Prolog | Declare constraints, engine searches | O(9^n) pruned | Minimal code, paradigm handles search automatically |
-| **Functional** | Haskell / Racket | Recursive backtracking with pure functions | O(9^n) | Search must be written explicitly, but remains declarative |
-| **Object-Oriented** | Java / Python | Backtracking solver as a class with methods | O(9^n) | More verbose, full control over heuristics and optimizations |
-| **Parallel** | C++ / CUDA | Explore multiple branches simultaneously | O(9^n / cores) | Fastest in theory, but coordination overhead and complexity are significant |
+| **Functional** | Haskell / Racket | Recursive backtracking with pure functions | O(9^n) | Search must be written explicitly, but stays declarative |
+| **Object-Oriented** | Java / Python | Backtracking solver as a class with methods | O(9^n) | More code, but full control over heuristics |
+| **Parallel** | C++ / CUDA | Explore multiple branches simultaneously | O(9^n / cores) | Fastest in theory, but coordination overhead adds real complexity |
 
-The key distinction between the Logic solution and the others is not complexity class — all backtracking approaches share the same worst case — but rather **who writes the search**. In Prolog, the search is provided by the language itself. In every other paradigm, the programmer must implement it explicitly.
+The biggest difference between the Logic approach and the rest is not the complexity class, since every backtracking solution shares the same worst case. The real difference is who is responsible for writing the search. In Prolog, the language handles it. In every other paradigm, you have to implement it yourself.
 
-The most practical alternative would be an **OOP solution in Python**, where a backtracking solver with a Minimum Remaining Values (MRV) heuristic — always choosing the cell with the fewest legal values first — can dramatically reduce the search tree in practice (Russell & Norvig, 2021, Chapter 6, p. 143). This heuristic is something Prolog's CLP(FD) also applies internally, which is part of what makes the two approaches comparable in real-world performance despite their structural differences.
+The closest practical alternative would be a Python OOP solver using a Minimum Remaining Values (MRV) heuristic, which always picks the cell with the fewest legal options left. That can seriously shrink the search tree (Russell & Norvig, 2021, Chapter 6, p. 143). Interestingly, CLP(FD) applies something equivalent internally, which is a big part of why both approaches end up performing similarly in practice despite being structured so differently.
 
 ---
 
