@@ -41,6 +41,47 @@ The following diagram shows this backtracking process over a partial board:
 
 With CLP(FD), constraint propagation runs before backtracking begins. When a value is assigned to a cell, the library automatically eliminates that value from the domains of all related cells in the same row, column, and box. This reduces the number of states explored significantly compared to naive backtracking.
 
+### Formal model: Pushdown Automaton (PDA)
+
+To formally characterize the computational behavior of the solver, it is useful to compare it against the automata models covered in the course: DFA, NFA, ε-NFA, and PDA.
+
+A **DFA or NFA** cannot model this solver because both are finite state machines with no memory beyond their current state. The solver needs to remember every assignment it has made so far in order to undo them during backtracking. A finite automaton has no mechanism for that, so DFA and NFA are ruled out. An **ε-NFA** adds epsilon transitions but still has no stack memory, so it falls short for the same reason.
+
+A **Pushdown Automaton** is the right fit. A PDA extends an NFA with a stack, and that stack is exactly what backtracking needs. Every time the solver assigns a value to a cell, that decision gets pushed onto the stack. When a domain is exhausted and the solver needs to backtrack, it pops the stack to restore the previous cell and resume trying other values from there. Without that push and pop behavior, backtracking is not possible.
+
+It is worth noting that the solver is not a PDA in the strict classical sense, since a classical PDA reads symbols from an input tape one at a time, and this solver does not have an input tape. The board itself serves as both the input and the working memory. So it is more accurate to say the solver behaves like an extended PDA, one where the stack holds full board state snapshots rather than single symbols. The formal model below captures the essential structure.
+
+The PDA has 7 states:
+
+| State | Role |
+|---|---|
+| q0 | Load board, initialize stack |
+| q1 | Select next empty cell |
+| q2 | Try next value from domain |
+| q3 | Check constraints |
+| q4 | Backtrack |
+| q5 | Accept (puzzle solved) |
+| q6 | Reject (no solution exists) |
+
+The transitions are:
+
+| From | To | Label | Meaning |
+|---|---|---|---|
+| q0 | q1 | push(B) | initialize stack with bottom marker |
+| q1 | q2 | push(A) | empty cell found, save assignment |
+| q1 | q5 | ε | no empty cells left, puzzle solved |
+| q2 | q3 | ε | value picked from domain |
+| q3 | q1 | ε | all constraints pass, move to next cell |
+| q3 | q2 | ε | constraint fails, values still remain |
+| q2 | q4 | ε | domain exhausted, no values left |
+| q4 | q2 | pop(A) | undo last assignment, resume previous cell |
+| q4 | q6 | pop(B) | stack is empty, no solution exists |
+
+The following diagram shows the PDA in theory:
+
+<img width="1045" height="576" alt="PDA" src="https://github.com/user-attachments/assets/2bfbf8a9-a0db-490c-a4b4-5a2a90c59589" />
+
+
 ---
 
 ## Implementation
