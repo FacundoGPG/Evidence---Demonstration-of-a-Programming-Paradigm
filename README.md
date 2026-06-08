@@ -288,7 +288,7 @@ The closest practical alternative would be a Python OOP solver using a Minimum R
 
 ## References
 
-Russell, S. J., & Norvig, P. (2021). *Artificial Intelligence: A Modern Approach* (4th ed.). Pearson. Chapter 6, pp. 202–210.
+Russell, S. J., & Norvig, P. (2021). *Artificial Intelligence: A Modern Approach* (4th ed.). Pearson..
 
 Sterling, L., & Shapiro, E. (1994). *The Art of Prolog: Advanced Programming Techniques* (2nd ed.). MIT Press.
 
