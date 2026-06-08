@@ -7,14 +7,14 @@
 
 sudoku(Rows) :-
     length(Rows, 9),
-    maplist(length_(9), Rows),
-    append(Rows, Cells),
-    Cells ins 1..9,
+    maplist(length_(9), Rows), % enfore 9x9 structure first
+    append(Rows, Cells), % flatten to apply domain at once
+    Cells ins 1..9,        % domain declaration - before constraints
     maplist(all_distinct, Rows),
     transpose(Rows, Cols),
     maplist(all_distinct, Cols),
     boxes(Rows),
-    maplist(label, Rows).
+    maplist(label, Rows).    % labeling last: triggers search after full propagation
 
 % length_/2
 % Helper to enforce each row has exactly 9 elements.
