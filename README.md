@@ -250,6 +250,7 @@ Row 1 contains two 5s, directly violating the row constraint. The solver returns
 ```
 false.
 ```
+<img width="2501" height="1269" alt="sudokutests" src="https://github.com/user-attachments/assets/075f6c0e-edbc-4a7f-8c04-6f30ecdddbc0" />
 
 ---
 
